@@ -4,7 +4,7 @@ GitHub issues or pull requests that
 are related to the items below. If there is no issue or pull
 request related to the change, then we may provide the commit.
 
-This is not a comprehensive list of changes but rather a hand-curated collection of the more notable ones. For a comprehensive history, see the [OpenSim Core GitHub repo](https://github.com/opensim/opensim-core).
+This is not a comprehensive list of changes but rather a hand-curated collection of the more notable ones. For a comprehensive history, see the [OpenSim Core GitHub repo](https://github.com/opensim-org/opensim-core).
 
 **Note**: This document is currently under construction.
 
@@ -32,10 +32,38 @@ Converting from v3.x to v4.0
   also use the `extend` variants. Otherwise, you will enter into an infinite recursion.
 - OpenSim now makes substantial use of C++11 features; if you compile OpenSim, your compiler
   must support C++11. Also, any C++ project in which you use OpenSim must also be compiled with C++11.
-- The following components have been upgraded to use Connectors to connect to
+- The following components have been upgraded to use Sockets to connect to
   other components they depend on (instead of string properties):
   - ContactGeometry (ContactSphere, ContactHalfSpace, ContactMesh)
 - Many of the methods in ScaleTool have now been marked const.
+- We created a new unified command line interface that will replace the
+  single-tool command line executables (`scale`, `ik`, `id`, `rra`, `cmc`,
+  etc.).
+  - `scale -S setup.xml` -> `opensim run-tool setup.xml`.
+  - `scale -PS` -> `opensim print-xml scale`
+  - `scale -PropertyInfo ...` -> `opensim info ...`
+  - `versionUpdate ...` -> `opensim update-file ...`
+- The `CoordinateSet` property in `Joint` has been replaced with a `coordinates`
+  list property and enumerations have been added for accessing the Coordinates
+  owned by a Joint. Code like `myPlanarJoint.getCoordinateSet()[0]` now becomes
+  `myPlanarJoint.getCoordinate(PlanarJoint::Coord::RotationZ)` (PRs #1116,
+  #1210, and #1222).
+- The `reverse` property in Joint can no longer be set by the user; Model uses
+  SimTK::MultibodyGraphMaker to determine whether joints should be reversed when
+  building the multibody system. The joint's transform and coordinates maintain
+  a parent->child sense even if the joint has been reversed. For backwards
+  compatibility, a joint's parent and child PhysicalFrames are swapped when
+  opening a Model if the `reverse` element is set to `true`.
+- The `Manager::integrate(SimTK::State&)` call is deprecated and replaced by
+  `Manager::integrate(SimTK::State&, double)`. Here is a before-after example
+  (see the documentation in the `Manager` class for more details):
+  - Before:
+	- manager.setInitialTime(0.0);
+	- manager.setFinalTime(1.0);
+	- manager.integrate(state);
+  - After:
+    - state.setTime(0.0);
+	- manager.integrate(state, 1.0);
 
 Composing a Component from other components
 -------------------------------------------
@@ -75,18 +103,31 @@ New Classes
 - Added Point as a new base class for all points, which include: Station, Marker, and PathPoints
 
 Removed Classes
---------------------------------
+---------------
 The following classes are no longer supported in OpenSim and are removed in OpenSim 4.0.
 - Muscle class `ContDerivMuscle_Depredated`.
 
-Python
-------
+MATLAB and Python interfaces
+----------------------------
+- The SimbodyMatterSubsystem class--which provides operators related to the mass
+matrix, Jacobians, inverse dynamics, etc.--is now accessible in MATLAB and
+Python (PR #930).
+
+MATLAB interface
+----------------
+- The configureOpenSim.m function should no longer require administrator
+  privileges for most users, and gives more verbose output to assist with
+  troubleshooting.
+
+Python interface
+----------------
 - Improved error handling. Now, OpenSim's error messages show up as exceptions
 in Python.
 
 Other Changes
 -------------
-- There is now a formal CMake mechanism for using OpenSim in your own C++ project. See cmake/SampleCMakeLists.txt. (PR #187)
+- There is now a formal CMake mechanism for using OpenSim in your own C++
+  project. See cmake/SampleCMakeLists.txt. (PR #187)
 - Substantial cleanup of the internal CMake scripts.
 - Lepton was upgraded to the latest version (PR #349)
 - Made Object::print a const member function (PR #191)
@@ -95,6 +136,20 @@ Other Changes
 - Marker location file output name in IK changed to reflect trial name for batch processing.
 - Created a method `ScaleTool::run()`, making it easier to run the Scale Tool
 programmatically in MATLAB or python.
+- Thelen2003Muscle, Millard2012EquilibriumMuscle, and
+  Millard2012AccelerationMuscle now throw an exception if the force equilibrium
+  calculation fails to converge (PR #1201).
+- Thelen2003Muscle and Millard2012EquilibriumMuscle no longer clamp excitations (i.e. controls)
+  internally. If controls are out of bounds an Exception is thrown. Also, the
+  `min_control` property now defaults to the `minimum_activation`. It is the
+  responsibility of the controller (or solver) to provide controls that are
+  within the valid ranges defined by the Actuators and that includes the
+  specific bounds of Muscle models. (PR #1548)
+- The `buildinfo.txt` file, which contains the name of the compiler used to
+  compile OpenSim and related information, is now named `OpenSim_buildinfo.txt`
+  and may be installed in a different location.
+- macOS and Linux users should no longer need to set `LD_LIBRARY_PATH` or
+  `DYLD_LIBRARY_PATH` to use OpenSim libraries.
 
 Documentation
 --------------

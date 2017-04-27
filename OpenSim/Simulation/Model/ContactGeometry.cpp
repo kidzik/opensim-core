@@ -7,7 +7,7 @@
  * National Institutes of Health (U54 GM072970, R24 HD065690) and by DARPA    *
  * through the Warrior Web program.                                           *
  *                                                                            *
- * Copyright (c) 2005-2016 Stanford University and the Authors                *
+ * Copyright (c) 2005-2017 Stanford University and the Authors                *
  * Author(s): Peter Eastman                                                   *
  *                                                                            *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may    *
@@ -22,8 +22,6 @@
  * -------------------------------------------------------------------------- */
 
 #include "ContactGeometry.h"
-#include "PhysicalOffsetFrame.h"
-#include <OpenSim/Common/ScaleSet.h>
 
 using namespace OpenSim;
 using SimTK::Vec3;
@@ -67,11 +65,11 @@ void ContactGeometry::constructProperties()
 {
     constructProperty_location(Vec3(0));
     constructProperty_orientation(Vec3(0));
-    constructProperty_display_preference(1);
+    Appearance defaultAppearance;
+    defaultAppearance.set_color(SimTK::Cyan);
+    defaultAppearance.set_representation(VisualRepresentation::DrawWireframe);
+    constructProperty_Appearance(defaultAppearance);
 
-    Array<double> defaultColor(1.0, 3); //color default to 0, 1, 1
-    defaultColor[0] = 0.0; 
-    constructProperty_color(defaultColor);
 }
 
 const Vec3& ContactGeometry::getLocation() const
@@ -98,19 +96,13 @@ SimTK::Transform ContactGeometry::getTransform() const
 
 const PhysicalFrame& ContactGeometry::getFrame() const
 {
-    return getConnector<PhysicalFrame>("frame").getConnectee();
+    return getSocket<PhysicalFrame>("frame").getConnectee();
 }
 
 void ContactGeometry::setFrame(const PhysicalFrame& frame)
 {
-    updConnector<PhysicalFrame>("frame").connect(frame);
+    connectSocket_frame(frame);
 }
-
-const int ContactGeometry::getDisplayPreference()
-{ return get_display_preference(); }
-
-void ContactGeometry::setDisplayPreference(const int dispPref)
-{ set_display_preference(dispPref); }
 
 const PhysicalFrame& ContactGeometry::getBody() const
 { return getFrame(); }

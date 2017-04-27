@@ -7,7 +7,7 @@
  * National Institutes of Health (U54 GM072970, R24 HD065690) and by DARPA    *
  * through the Warrior Web program.                                           *
  *                                                                            *
- * Copyright (c) 2005-2015 Stanford University and the Authors                *
+ * Copyright (c) 2005-2017 Stanford University and the Authors                *
  * Author(s): Ayman Habib                                                     *
  *                                                                            *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may    *
@@ -24,14 +24,10 @@
 //=============================================================================
 // INCLUDES
 //=============================================================================
-#include <OpenSim/Simulation/osimSimulationDLL.h>
-#include <OpenSim/Common/Property.h>
-#include <OpenSim/Common/Component.h>
+#include <fstream>
 #include "Frame.h"
-#include "PhysicalFrame.h"
 #include "Geometry.h"
 #include "Model.h"
-#include "ModelVisualizer.h"
 //=============================================================================
 // STATICS
 //=============================================================================
@@ -39,7 +35,7 @@ using namespace std;
 using namespace OpenSim;
 using namespace SimTK;
 
-OpenSim_DEFINE_CONNECTOR_FD(frame, Geometry);
+OpenSim_DEFINE_SOCKET_FD(frame, Geometry);
 
 Geometry::Geometry() {
     setNull();
@@ -48,21 +44,21 @@ Geometry::Geometry() {
 
 void Geometry::setFrame(const Frame& frame)
 {
-    updConnector<Frame>("frame").setConnecteeName(frame.getRelativePathName(*this));
+    updSocket<Frame>("frame").setConnecteeName(frame.getRelativePathName(*this));
 }
 
 const OpenSim::Frame& Geometry::getFrame() const
 {
-    return getConnector<Frame>("frame").getConnectee();
+    return getSocket<Frame>("frame").getConnectee();
 }
 
 void Geometry::extendConnect(Component& root)
 {
     Super::extendConnect(root);
 
-    bool attachedToFrame = getConnector<Frame>("frame").isConnected();
+    bool attachedToFrame = getSocket<Frame>("frame").isConnected();
     bool hasInputTransform = getInput("transform").isConnected();
-    // Being both attached to a Frame (i.e. Connector<Frame> connected) 
+    // Being both attached to a Frame (i.e. Socket<Frame> connected) 
     // and the Input transform connected has ambiguous behavior so disallow it
     if (attachedToFrame && hasInputTransform ) {
         OPENSIM_THROW(Exception, getConcreteClassName() + " '" + getName()
@@ -76,6 +72,17 @@ void Geometry::extendConnect(Component& root)
     }
 }
 
+void FrameGeometry::generateDecorations(bool fixed,
+    const ModelDisplayHints& hints,
+    const SimTK::State& state,
+    SimTK::Array_<SimTK::DecorativeGeometry>& appendToThis) const
+{
+    if (!hints.get_show_frames())
+        return;
+    // Call base class
+    Super::generateDecorations(fixed, hints, state, appendToThis);
+
+}
 void Geometry::generateDecorations(bool fixed, 
     const ModelDisplayHints& hints,
     const SimTK::State& state,
@@ -87,6 +94,8 @@ void Geometry::generateDecorations(bool fixed,
     if (!fixed && !getInput("transform").isConnected())
         return; 
     
+    if (!get_Appearance().get_visible()) return;
+
     SimTK::Array_<SimTK::DecorativeGeometry> decos;
     implementCreateDecorativeGeometry(decos);
     if (decos.size() == 0) return;
@@ -208,25 +217,25 @@ void Mesh::extendFinalizeFromProperties() {
 
     if (!isObjectUpToDateWithProperties()) {
         const Component* rootModel = nullptr;
-        if (!hasParent()) {
-            std::clog << "Mesh " << get_mesh_file() << " not connected to model..ignoring\n";
+        if (!hasOwner()) {
+            std::cout << "Mesh " << get_mesh_file() << " not connected to model..ignoring\n";
             return;   // Orphan Mesh not part of a model yet
         }
-        const Component* parent = &getParent();
-        while (parent != nullptr) {
-            if (dynamic_cast<const Model*>(parent) != nullptr) {
-                rootModel = parent;
+        const Component* owner = &getOwner();
+        while (owner != nullptr) {
+            if (dynamic_cast<const Model*>(owner) != nullptr) {
+                rootModel = owner;
                 break;
             }
-            if (parent->hasParent())
-                parent = &(parent->getParent()); // traverse up Component tree
+            if (owner->hasOwner())
+                owner = &(owner->getOwner()); // traverse up Component tree
             else
                 break; // can't traverse up.
         }
 
         if (rootModel == nullptr) {
-            std::clog << "Mesh " << get_mesh_file() << " not connected to model..ignoring\n";
-            return;   // Orphan Mesh not descendent of a model
+            std::cout << "Mesh " << get_mesh_file() << " not connected to model..ignoring\n";
+            return;   // Orphan Mesh not descendant of a model
         }
         // Current interface to Visualizer calls generateDecorations on every frame.
         // On first time through, load file and create DecorativeMeshFile and cache it
@@ -237,7 +246,7 @@ void Mesh::extendFinalizeFromProperties() {
             isAbsolutePath, directory, fileName, extension);
         const string lowerExtension = SimTK::String::toLower(extension);
         if (lowerExtension != ".vtp" && lowerExtension != ".obj" && lowerExtension != ".stl") {
-            std::clog << "ModelVisualizer ignoring '" << file
+            std::cout << "ModelVisualizer ignoring '" << file
                 << "'; only .vtp .stl and .obj files currently supported.\n";
             return;
         }
@@ -248,13 +257,15 @@ void Mesh::extendFinalizeFromProperties() {
         bool foundIt = ModelVisualizer::findGeometryFile(model, file, isAbsolutePath, attempts);
 
         if (!foundIt) {
-            std::clog << "ModelVisualizer couldn't find file '" << file
+            if (getDebugLevel()==0) { return; }
+
+            std::cout << "ModelVisualizer couldn't find file '" << file
                 << "'; tried\n";
             for (unsigned i = 0; i < attempts.size(); ++i)
-                std::clog << "  " << attempts[i] << "\n";
+                std::cout << "  " << attempts[i] << "\n";
             if (!isAbsolutePath &&
                 !Pathname::environmentVariableExists("OPENSIM_HOME"))
-                std::clog << "Set environment variable OPENSIM_HOME "
+                std::cout << "Set environment variable OPENSIM_HOME "
                 << "to search $OPENSIM_HOME/Geometry.\n";
             return;
         }
@@ -263,12 +274,13 @@ void Mesh::extendFinalizeFromProperties() {
         try {
             std::ifstream objFile;
             objFile.open(attempts.back().c_str());
-            pmesh.loadFile(attempts.back().c_str());
             // objFile closes when destructed
+            // if the file can be opened but had bad contents e.g. binary vtp 
+            // it will be handled downstream 
 
         }
         catch (const std::exception& e) {
-            std::clog << "Visualizer couldn't read "
+            std::cout << "Visualizer couldn't open "
                 << attempts.back() << " because:\n"
                 << e.what() << "\n";
             return;

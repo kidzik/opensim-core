@@ -1,7 +1,8 @@
-OpenSim Core [![Travis][buildstatus_image_travis]][travisci] [![Appveyor][buildstatus_image_appveyor]][appveyorci]
+OpenSim Core
 ============
+ [![Travis][buildstatus_image_travis]][travisci] [![Appveyor][buildstatus_image_appveyor]][appveyorci] [![ZenHub][zenhub_image]][zenhub]
 
-**NOTE: This repository contains OpenSim 4.0 development and cannot be used to build OpenSim 3.x or earlier. For OpenSim 3.x, see [here](http://simtk-confluence.stanford.edu:8080/display/OpenSim/Building+OpenSim+from+Source).**
+**NOTE: This repository cannot be used to build OpenSim 3.x or earlier. For OpenSim 3.x, see [here](http://simtk-confluence.stanford.edu:8080/display/OpenSim/Building+OpenSim+from+Source).**
 
 OpenSim is software that lets users develop models of musculoskeletal
 structures and create dynamic simulations of movement, such as this one:
@@ -23,7 +24,10 @@ include source code for the OpenSim GUI.
 
 Simple example
 --------------
-Let's simulate a simple arm whose elbow is actuated by a muscle:
+Let's simulate a simple arm whose elbow is actuated by a muscle, using 
+the C++ interface (You can find a Python version of this example at 
+`Bindings/Python/examples/build_simple_arm_model.py`):
+
 ```cpp
 #include <OpenSim/OpenSim.h>
 using namespace SimTK;
@@ -68,26 +72,36 @@ int main() {
     // Add a console reporter to print the muscle fiber force and elbow angle.
     ConsoleReporter* reporter = new ConsoleReporter();
     reporter->set_report_time_interval(1.0);
-    reporter->updInput("inputs").connect(biceps->getOutput("fiber_force"));
-    reporter->updInput("inputs").connect(
-        elbow->getCoordinateSet()[0].getOutput("value"), "elbow_angle");
+    reporter->addToReport(biceps->getOutput("fiber_force"));
+    reporter->addToReport(
+        elbow->getCoordinate(PinJoint::Coord::RotationZ).getOutput("value"),
+        "elbow_angle");
     model.addComponent(reporter);
+
+    // Add display geometry.
+    Ellipsoid bodyGeometry(0.1, 0.5, 0.1);
+    bodyGeometry.setColor(Gray);
+    // Attach an ellipsoid to a frame located at the center of each body.
+    PhysicalOffsetFrame* humerusCenter = new PhysicalOffsetFrame(
+        "humerusCenter", "humerus", Transform(Vec3(0, 0.5, 0)));
+    humerus->addComponent(humerusCenter);
+    humerusCenter->attachGeometry(bodyGeometry.clone());
+    PhysicalOffsetFrame* radiusCenter = new PhysicalOffsetFrame(
+        "radiusCenter", "radius", Transform(Vec3(0, 0.5, 0)));
+    radius->addComponent(radiusCenter);
+    radiusCenter->attachGeometry(bodyGeometry.clone());
 
     // Configure the model.
     State& state = model.initSystem();
     // Fix the shoulder at its default angle and begin with the elbow flexed.
-    shoulder->upd_CoordinateSet()[0].setLocked(state, true);
-    elbow->upd_CoordinateSet()[0].setValue(state, 0.5 * Pi);
+    shoulder->getCoordinate().setLocked(state, true);
+    elbow->getCoordinate().setValue(state, 0.5 * Pi);
     model.equilibrateMuscles(state);
 
-    // Add display geometry.
+    // Configure the visualizer.
     model.updMatterSubsystem().setShowDefaultGeometry(true);
     Visualizer& viz = model.updVisualizer().updSimbodyVisualizer();
     viz.setBackgroundColor(White);
-    // Ellipsoids: 0.5 m radius along y-axis, centered 0.5 m up along y-axis.
-    DecorativeEllipsoid geom(Vec3(0.1, 0.5, 0.1)); Vec3 center(0, 0.5, 0);
-    viz.addDecoration(humerus->getMobilizedBodyIndex(), Transform(center), geom);
-    viz.addDecoration( radius->getMobilizedBodyIndex(), Transform(center), geom);
 
     // Simulate.
     RungeKuttaMersonIntegrator integrator(model.getSystem());
@@ -104,26 +118,29 @@ This code produces the following animation:
 ![Simulation of an arm actuated by a muscle][simple_example_gif]
 
 and prints the following information to the console:
-
-        [reporter]
-                time|  fiber_force| elbow_angle|
-                   0|     1.180969|   1.5707963|
-                   1|     57.27509|  0.77066412|
-                   2|    19.728411|   1.5680456|
-                   3|    56.090431|   1.4419861|
-                   4|     34.54835|    1.508348|
-                   5|    32.603721|   1.5180237|
-                   6|    37.136052|   1.5021235|
-                   7|    35.698502|   1.5071888|
-                   8|     34.18601|   1.5079186|
-                   9|    34.341649|    1.506727|
-                  10|    35.784713|    1.507164|
-
+```
+[reporter]
+              |   /model_/bice|               | 
+          time| ps|fiber_force|    elbow_angle| 
+--------------| --------------| --------------| 
+  0.000000e+00| 1.18096897e+00| 1.57079633e+00| 
+1.00000000e+00| 5.72750904e+01| 7.70664118e-01| 
+2.00000000e+00| 1.97284113e+01| 1.56804557e+00| 
+3.00000000e+00| 5.60904315e+01| 1.44198608e+00| 
+4.00000000e+00| 3.45483498e+01| 1.50834805e+00| 
+5.00000000e+00| 3.26037208e+01| 1.51802366e+00| 
+6.00000000e+00| 3.71360518e+01| 1.50212351e+00| 
+7.00000000e+00| 3.56985024e+01| 1.50718884e+00| 
+8.00000000e+00| 3.41860103e+01| 1.50791862e+00| 
+9.00000000e+00| 3.43416494e+01| 1.50672695e+00| 
+1.00000000e+01| 3.57847134e+01| 1.50716396e+00| 
+```
 ---
-
 
 Building from the source code
 -----------------------------
+
+**NOTE -- In all platforms (Windows, OSX, Linux), it is advised to build all OpenSim Dependencies (Simbody, BTK etc) with same *CMAKE_BUILD_TYPE* (Linux) / *CONFIGURATION* (MSVC/Xcode) as OpenSim. For example, if OpenSim is to be built with *CMAKE_BUILD_TYPE/CONFIGURATION* as *Debug*, Simbody, BTK and all other OpenSim dependencies also should be built with *CMAKE_BUILD_TYPE/CONFIGURATION* as *Debug*. Failing to do so *may* result in mysterious runtime errors like 'segfault' in standard c++ library implementation.**
 
 We support a few ways of building OpenSim:
 
@@ -139,18 +156,25 @@ On Windows using Visual Studio
 
 * **operating system**: Windows 7 or 8.
 * **cross-platform build system**:
-  [CMake](http://www.cmake.org/cmake/resources/software.html) >= 3.1.3
+  [CMake](http://www.cmake.org/cmake/resources/software.html) >= 3.2
 * **compiler / IDE**: [Visual Studio 2015](https://www.visualstudio.com/).
     * *Visual Studio Community 2015* is sufficient and is free for everyone.
-        If you want to use *Visual Studio Enterprise 2015*, you may be able
-        to get it for free at [Dreamspark](https://www.dreamspark.com) if
-        you are at an academic institution.
     * Visual Studio 2015 does not install C++
       support by default. During the installation you must select
       *Custom*, and check *Programming Languages > Visual C++ > Common Tools
       for Visual C++ 2015*.
-      You can uncheck all other boxes. If you have already installed Visual
-      Studio without C++ support, simply re-run the installer and select *Modify*.
+      You can uncheck all other boxes. If Visual Studio is installed without C++
+      support, CMake will report the following errors:
+      
+      ```
+      The C compiler identification is unknown
+      The CXX compiler identification is unknown
+      ```
+      
+      If you have already installed Visual Studio without C++ support, simply
+      re-run the installer and select *Modify*. Alternatively, go to
+      *File > New > Project...* in Visual Studio, select *Visual C++*, and click
+      *Install Visual C++ 2015 Tools for Windows Desktop*.
 * **physics engine**: Simbody >= 3.6. Two options:
     * Let OpenSim get this for you using superbuild (see below).
     * [Build on your own](
@@ -158,6 +182,9 @@ On Windows using Visual Studio
 * **C3D file support**: Biomechanical-ToolKit Core. Two options:
     * Let OpenSim get this for you using superbuild (see below).
     * [Build on your own](https://github.com/klshrinidhi/BTKCore).
+* **command-line argument parsing**: docopt.cpp. Two options:
+    * Let OpenSim get this for you using superbuild (see below); much easier!
+    * [Build on your own](https://github.com/docopt/docopt.cpp) (no instructions).
 * **API documentation** (optional):
   [Doxygen](http://www.stack.nl/~dimitri/doxygen/download.html) >= 1.8.6
 * **version control** (optional): git. There are many options:
@@ -165,9 +192,11 @@ On Windows using Visual Studio
     * [TortoiseGit](https://code.google.com/p/tortoisegit/wiki/Download),
       intermediate; good for TortoiseSVN users;
     * [GitHub for Windows](https://windows.github.com/), easiest.
-* **Bindings** (optional): [SWIG](http://www.swig.org/) 3.0.5
-    * **MATLAB scripting** (optional): [Java development kit][java] 1.7.
-    * **python scripting** (optional):
+* **Bindings** (optional): [SWIG](http://www.swig.org/) 3.0.6
+    * **MATLAB scripting** (optional): [Java development kit][java] >= 1.7.
+        * Note: Older versions of MATLAB may use an older version of JVM. Run
+                'ver' in MATLAB to check MATLAB's JVM version (must be >= 1.7).
+    * **Python scripting** (optional):
         * [Enthought Canopy](https://www.enthought.com/products/canopy/), or
         * [Anaconda](https://store.continuum.io/cshop/anaconda/)
     * The choice between 32-bit/64-bit must be the same between Java, Python,
@@ -221,17 +250,18 @@ On Windows using Visual Studio
         cmake --build . --config RelWithDebInfo
 
    Alternative values for `--config` in this command are:
-    * **Debug**: debugger symbols; no optimizations (more than 10x slower).
-      Library names end with `_d`.
-    * **Release**: no debugger symbols; optimized.
-    * **RelWithDebInfo**: debugger symbols; optimized. Bigger but not slower
-      than Release; choose this if unsure.
-    * **MinSizeRel**: minimum size; optimized.
+   
+   * **Debug**: debugger symbols; no optimizations (more than 10x slower).
+     Library names end with `_d`.
+   * **Release**: no debugger symbols; optimized.
+   * **RelWithDebInfo**: debugger symbols; optimized. Bigger but not slower
+     than Release; choose this if unsure.
+   * **MinSizeRel**: minimum size; optimized.
 
-      You must run this command for each of the configurations you plan to use
-      with OpenSim (see below). You should run this command for the release
-      configuration *last* to ensure that you use the release version of the
-      command-line applications instead of the slow debug versions.
+   You must run this command for each of the configurations you plan to use
+   with OpenSim (see below). You should run this command for the release
+   configuration *last* to ensure that you use the release version of the
+   command-line applications instead of the slow debug versions.
 11. If you like, you can now remove the directory used for building
     dependencies (`c:/opensim-core-dependencies-build`).
 
@@ -243,8 +273,9 @@ On Windows using Visual Studio
    `C:/opensim-core-build`, or some other path that is not inside your source
    directory. This is *not* where we are installing OpenSim-Core; see below.
 4. Click the **Configure** button.
-    1. Choose the *Visual Studio 14* generator (for Visual Studio 2015). To
-       build as 64-bit, select *Visual Studio 14 Win64*. The choice between
+    1. Choose the *Visual Studio 14* or *Visual Studio 14 2015* generator. To
+       build as 64-bit, select *Visual Studio 14 Win64* or 
+       *Visual Studio 14 2015 Win64*. The choice between
        32-bit/64-bit must be the same across all dependencies.
     2. Click **Finish**.
 5. Where do you want to install OpenSim-Core on your computer? Set this by
@@ -262,8 +293,12 @@ On Windows using Visual Studio
            `BTKConfig.cmake`. If the root directory of your BTK installation is
            `C:/BTKCore-install`, then set this variable to
            `C:/BTKCore-install/share/btk-0.4dev`.
+        3. docopt.cpp. Set the variable `docopt_DIR` to the directory
+           containing `docopt-config.cmake`. If the root directory of your 
+           docopt.cpp installation is `C:/docopt.cpp-install`, then set this 
+           variable to `C:/docopt.cpp-install/lib/cmake`.
 7. Set the remaining configuration options.
-    * `BUILD_EXAMPLES` to compile C++ API examples.
+    * `BUILD_API_EXAMPLES` to compile C++ API examples.
     * `BUILD_TESTING` to ensure that OpenSim works correctly. The tests take a
       while to build; if you want to build OpenSim quickly, you can turn this
       off.
@@ -398,7 +433,7 @@ ctest -j8
 
 * **operating system**: Mac OSX 10.11 El Capitan.
 * **cross-platform build system**:
-  [CMake](http://www.cmake.org/cmake/resources/software.html) >= 2.8.8
+  [CMake](http://www.cmake.org/cmake/resources/software.html) >= 3.2
 * **compiler / IDE**: [Xcode](https://developer.apple.com/xcode/) >= 7.3 (the latest version), through
   the Mac App Store.
 * **physics engine**: Simbody >= 3.6. Two options:
@@ -407,15 +442,20 @@ ctest -j8
 * **C3D file support**: Biomechanical-ToolKit Core. Two options:
   * Let OpenSim get this for you using superbuild (see below).
   * [Build on your own](https://github.com/klshrinidhi/BTKCore).
+* **command-line argument parsing**: docopt.cpp. Two options:
+    * Let OpenSim get this for you using superbuild (see below); much easier!
+    * [Build on your own](https://github.com/docopt/docopt.cpp) (no instructions).
 * **API documentation** (optional):
   [Doxygen](http://www.stack.nl/~dimitri/doxygen/download.html) >= 1.8.6
 * **version control** (optional): git.
     * Xcode Command Line Tools gives you git on the command line.
     * [GitHub for Mac](https://mac.github.com), for a simple-to-use GUI.
-* **Bindings** (optional): [SWIG](http://www.swig.org/) 3.0.5
-    * **MATLAB scripting** (optional): [Java development kit][java] 1.7.
-    * **python scripting** (optional):
-        * Mac OSX comes with python, but you could also use:
+* **Bindings** (optional): [SWIG](http://www.swig.org/) 3.0.6
+    * **MATLAB scripting** (optional): [Java development kit][java] >= 1.7.
+        * Note: Older versions of MATLAB may use an older version of JVM. Run
+                'ver' in MATLAB to check MATLAB's JVM version (must be >= 1.7).
+    * **Python scripting** (optional):
+        * Mac OSX comes with Python, but you could also use:
         * [`brew install python`](http://brew.sh),
         * [Enthought Canopy](https://www.enthought.com/products/canopy/), or
         * [Anaconda](https://store.continuum.io/cshop/anaconda/)
@@ -501,8 +541,12 @@ You can get most of these dependencies using [Homebrew](http://brew.sh):
         2. BTK: Set the `BTK_DIR` variable to the directory containing
            `BTKConfig.cmake`. If you installed BTK in `~/BTKCore-install`, then
            set `BTK_DIR` to `~/BTKCore-install/share/btk-0.4dev`
+        3. docopt.cpp. Set the variable `docopt_DIR` to the directory
+           containing `docopt-config.cmake`. If the root directory of your 
+           docopt.cpp installation is `~/docopt.cpp-install`, then set this 
+           variable to `~/docopt.cpp-install/lib/cmake`.
 7. Set the remaining configuration options.
-    * `BUILD_EXAMPLES` to compile C++ API examples.
+    * `BUILD_API_EXAMPLES` to compile C++ API examples.
     * `BUILD_TESTING` to ensure that OpenSim works correctly. The tests take a
       while to build; if you want to build OpenSim quickly, you can turn this
       off.
@@ -510,11 +554,7 @@ You can get most of these dependencies using [Homebrew](http://brew.sh):
       Java; see dependencies above.
     * `BUILD_PYTHON_WRAPPING` if you want to access OpenSim through Python; see
       dependencies above. CMake sets `PYTHON_*` variables to tell you the
-      Python it will use for building the wrappers. (If you installed python
-      with homebrew, [CMake will not find the homebrew python libraries on its
-      own](https://github.com/Homebrew/homebrew/issues/25118); you must set the
-      CMake variable `PYTHON_LIBRARIES` manually. Use `'$(python-config
-      --prefix)/lib/libpython2.7.dylib'` in bash to get the correct value.)
+      Python it will use for building the wrappers.
     * `BUILD_API_ONLY` if you don't want to build the command-line applications.
 8. Click the **Configure** button again. Then, click **Generate** to create
    Xcode project files in the build directory.
@@ -554,24 +594,10 @@ You can get most of these dependencies using [Homebrew](http://brew.sh):
 #### Set environment variables
 
 1. **Executables**. If you want to run OpenSim-Core's executables from
-   anywhere on your computer, you must update your PATH. *Note* some of the
-   names of OpenSim-Core executables conflict with some UNIX commands (e.g.,
-   `id`). To give preference to OpenSim-Core's executables, we must *prepend*
-   OpenSim-Core's `bin/` directory to the path. Open a terminal and type:
+   anywhere on your computer, you must update your PATH. Open a terminal and
+   type:
 
         $ echo 'export PATH=~/opensim-core/bin:$PATH' >> ~/.bash_profile
-
-2. **Libraries**. Hopefully you can skip this step. This step is required if:
-  1. You are using CMake version 2.8.11 or older.
-  2. You plan on building C++ executables or libraries on top of OpenSim, *and*
-     you plan to "install" them in the CMake sense of the word (that is, you're
-     not going to simply use them from your project's build directory).
-  3. You plan to use the Java or MATLAB scripting.
-
-  If any of these are true, then you must add OpenSim-Core libraries to your
-  linker path. Open a terminal and type:
-
-          $ echo 'export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:~/opensim-core/lib' >> ~/.bash_profile
 
 Your changes will only take effect in new terminal windows.
 
@@ -581,16 +607,15 @@ On Ubuntu using Unix Makefiles
 
 #### Get the dependencies
 
-Most dependencies can be obtained via the Ubuntu software repositories. On each
-line below, we show the corresponding package.
+Most dependencies can be obtained via the Ubuntu software repositories;
+especially if you are using Ubuntu 15.10 or later. On each line below, we show
+the Ubuntu package names for the dependencies. You can find instructions for
+specific Ubuntu versions under 'For the impatient' below.
 
-* **operating system**: Ubuntu 13.10 or later.
 * **cross-platform build system**:
-  [CMake](http://www.cmake.org/cmake/resources/software.html) >= 2.8.8;
-  `cmake-gui`. Ubuntu 12.04 only has 2.8.6 available; download from the website
-  or from this [third party
-  PPA](https://launchpad.net/~robotology/+archive/ubuntu/ppa).
-* **compiler**: [gcc](http://gcc.gnu.org) >= 4.8; `g++-4.8`, or
+  [CMake](http://www.cmake.org/cmake/resources/software.html) >= 3.2;
+  `cmake-gui`. 
+* **compiler**: [gcc](http://gcc.gnu.org) >= 4.9; `g++-4.9`, or
   [Clang](http://clang.llvm.org) >= 3.4; `clang-3.4`.
 * **physics engine**: Simbody >= 3.6. Two options:
   * Let OpenSim get this for you using superbuild (see below).
@@ -598,18 +623,23 @@ line below, we show the corresponding package.
 * **C3D file support**: Biomechanical-ToolKit Core. Two options:
   * Let OpenSim get this for you using superbuild (see below).
   * [Build on your own](https://github.com/klshrinidhi/BTKCore).
+* **command-line argument parsing**: docopt.cpp. Two options:
+    * Let OpenSim get this for you using superbuild (see below); much easier!
+    * [Build on your own](https://github.com/docopt/docopt.cpp) (no instructions).
 * **API documentation** (optional):
   [Doxygen](http://www.stack.nl/~dimitri/doxygen/download.html) >= 1.8.6;
   `doxygen`.
 * **version control** (optional): git; `git`.
-* **Bindings** (optional): [SWIG](http://www.swig.org/) 3.0.5; must get from SWIG website.
+* **Bindings** (optional): [SWIG](http://www.swig.org/) 3.0.6; must get from SWIG website.
     * **MATLAB scripting** (optional): [Java development kit][java] >= 1.7;
       `openjdk-6-jdk` or `openjdk-7-jdk`.
-    * **python scripting** (optional): `python-dev`.
+        * Note: Older versions of MATLAB may use an older version of JVM. Run
+                'ver' in MATLAB to check MATLAB's JVM version (must be >= 1.7).
+    * **Python scripting** (optional): `python-dev`.
 
 For example, you could get the required dependencies (except Simbody) via:
 
-    $ sudo apt-get install cmake-gui g++-4.8
+    $ sudo apt-get install cmake-gui g++-4.9
 
 And you could get all the optional dependencies via:
 
@@ -695,6 +725,10 @@ And you could get all the optional dependencies via:
         2. BTK: Set the `BTK_DIR` variable to the directory containing
            `BTKConfig.cmake`. If you installed BTK in `~/BTK-install`, then set
            `BTK-DIR` to `~/BTK-install/share/btk-0.4dev`.
+        3. docopt.cpp. Set the variable `docopt_DIR` to the directory
+           containing `docopt-config.cmake`. If the root directory of your 
+           docopt.cpp installation is `~/docopt.cpp-install`, then set this 
+           variable to `~/docopt.cpp-install/lib/cmake`.
 7. Choose your build type by setting `CMAKE_BUILD_TYPE` to one of the following:
     * **Debug**: debugger symbols; no optimizations (more than 10x slower).
     Library names end with `_d`.
@@ -712,7 +746,7 @@ And you could get all the optional dependencies via:
     release version of the command-line applications instead of the slow debug
     versions.
 8. Set the remaining configuration options.
-    * `BUILD_EXAMPLES` to compile C++ API examples.
+    * `BUILD_API_EXAMPLES` to compile C++ API examples.
     * `BUILD_TESTING` to ensure that OpenSim works correctly. The tests take a
       while to build; if you want to build OpenSim quickly, you can turn this
       off.
@@ -721,9 +755,9 @@ And you could get all the optional dependencies via:
     * `BUILD_PYTHON_WRAPPING` if you want to access OpenSim through Python; see
       dependencies above.
     * `BUILD_API_ONLY` if you don't want to build the command-line applications.
-    * `OPENSIM_COPY_SIMBODY` to decide if Simbody headers and libraries should
-      be installed inside OpenSim; you want this off if you're installing
-      Simbody and OpenSim into `/usr/` or `/usr/local/`.
+    * `OPENSIM_COPY_DEPENDENCIES` to decide if Simbody and BTK are copied into
+      the OpenSim installation; you want this off if you're installing OpenSim
+      into `/usr/` or `/usr/local/`.
 9. Click the **Configure** button again. Then, click **Generate** to create
    Makefiles in the build directory.
 
@@ -753,19 +787,10 @@ And you could get all the optional dependencies via:
 
 #### Set environment variables
 
-1. **Executables**. Add OpenSim-Core's executables to the path so you can access them from any
-   directory on your computer. NOTE that some of the names of OpenSim-Core
-   executables conflict with some UNIX commands (e.g., `id`). To give
-   preference to OpenSim-Core's executables, we must *prepend* OpenSim-Core's
-   `bin/` directory to the path.
+1. **Executables**. Add OpenSim-Core's executables to the path so you can
+   access them from any directory on your computer.
 
         $ echo 'export PATH=~/opensim-core/bin:$PATH' >> ~/.bashrc
-
-2. **Libraries**. Allow executables to find OpenSim-Core libraries by
-  adding the OpenSim-Core
-   `lib/` directory to your linker path.
-
-        $ echo 'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:~/opensim-core/lib' >> ~/.bashrc
 
 Your changes will only take effect in new terminal windows.
 
@@ -834,7 +859,7 @@ cmake ../opensim-core \
 make -j8
 ctest -j8
 ```
-##### Ubuntu 16.04 Xenial Xerus
+##### Ubuntu 16.04 Xenial Xerus AND Ubuntu 16.10 Yakkety Yak
 In **Terminal** --
 ```shell
 sudo apt-get update
@@ -864,11 +889,13 @@ make -j8
 ctest -j8
 ```
 
-
 [buildstatus_image_travis]: https://travis-ci.org/opensim-org/opensim-core.svg?branch=master
 [travisci]: https://travis-ci.org/opensim-org/opensim-core
 [buildstatus_image_appveyor]: https://ci.appveyor.com/api/projects/status/i4wxnmx9jlk69kge/branch/master?svg=true
 [appveyorci]: https://ci.appveyor.com/project/opensim-org/opensim-core/branch/master
+[zenhub_image]: https://raw.githubusercontent.com/ZenHubIO/support/master/zenhub-badge.png
+[zenhub]: https://zenhub.com
+
 [running_gif]: doc/images/opensim_running.gif
 [simple_example_gif]: doc/images/opensim_double_pendulum_muscle.gif
 [java]: http://www.oracle.com/technetwork/java/javase/downloads/index.html

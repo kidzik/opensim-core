@@ -7,7 +7,7 @@
  * National Institutes of Health (U54 GM072970, R24 HD065690) and by DARPA    *
  * through the Warrior Web program.                                           *
  *                                                                            *
- * Copyright (c) 2005-2012 Stanford University and the Authors                *
+ * Copyright (c) 2005-2017 Stanford University and the Authors                *
  * Author(s): Matt S. DeMers                                                  *
  *                                                                            *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may    *
@@ -72,7 +72,7 @@ int main()
             Transform(Vec3(0.0, linkageLength / 2.0, 0.0)));
         cyl1Frame->setName("Cyl1_frame");
         cyl1Frame->attachGeometry(cyl.clone());
-        osimModel.addFrame(cyl1Frame);
+        osimModel.addComponent(cyl1Frame);
 
         // Create a second linkage body as a clone of the first
         OpenSim::Body* linkage2 = linkage1->clone();
@@ -80,7 +80,7 @@ int main()
         Frame* cyl2Frame = new PhysicalOffsetFrame(*linkage2,
             Transform(Vec3(0.0, linkageLength / 2.0, 0.0)));
         cyl2Frame->setName("Cyl2_frame");
-        osimModel.addFrame(cyl2Frame);
+        osimModel.addComponent(cyl2Frame);
 
         // Create a block to be the pelvis
         double blockMass = 20.0, blockSideLength = 0.2;
@@ -102,17 +102,14 @@ int main()
             locationInChild, orientationInChild);
         
         double range[2] = {-SimTK::Pi*2, SimTK::Pi*2};
-        CoordinateSet& ankleCoordinateSet = ankle->upd_CoordinateSet();
-        ankleCoordinateSet[0].setName("q1");
-        ankleCoordinateSet[0].setRange(range);
+        ankle->updCoordinate().setName("q1");
+        ankle->updCoordinate().setRange(range);
 
-        CoordinateSet& kneeCoordinateSet = knee->upd_CoordinateSet();
-        kneeCoordinateSet[0].setName("q2");
-        kneeCoordinateSet[0].setRange(range);
+        knee->updCoordinate().setName("q2");
+        knee->updCoordinate().setRange(range);
 
-        CoordinateSet& hipCoordinateSet = hip->upd_CoordinateSet();
-        hipCoordinateSet[0].setName("q3");
-        hipCoordinateSet[0].setRange(range);
+        hip->updCoordinate().setName("q3");
+        hip->updCoordinate().setRange(range);
 
         // Add the bodies to the model
         osimModel.addBody(linkage1);
@@ -212,22 +209,22 @@ int main()
         std::cout << "Initial time: " << si.getTime() << std::endl;
 
         // Integrate
-        manager.setInitialTime(t0);
-        manager.setFinalTime(tf);
+        si.setTime(t0);
         std::cout<<"\n\nIntegrating from " << t0 << " to " << tf << std::endl;
-        manager.integrate(si);
+        manager.integrate(si, tf);
 
         // Save results
         auto controlsTable = osimModel.getControlsTable();
-        STOFileAdapter::write(controlsTable, "SpringActuatedLeg_controls.sto");
+        STOFileAdapter_<double>::write(controlsTable, 
+                                      "SpringActuatedLeg_controls.sto");
 
         auto statesTable = manager.getStatesTable();
         osimModel.updSimbodyEngine().convertRadiansToDegrees(statesTable);
-        STOFileAdapter::write(statesTable, 
-                              "SpringActuatedLeg_states_degrees.sto");
+        STOFileAdapter_<double>::write(statesTable, 
+                                      "SpringActuatedLeg_states_degrees.sto");
 
         auto forcesTable = forces->getForcesTable();
-        STOFileAdapter::write(forcesTable, "actuator_forces.sto");
+        STOFileAdapter_<double>::write(forcesTable, "actuator_forces.sto");
     }
     catch (const std::exception& ex)
     {

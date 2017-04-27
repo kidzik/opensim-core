@@ -7,7 +7,7 @@
  * National Institutes of Health (U54 GM072970, R24 HD065690) and by DARPA    *
  * through the Warrior Web program.                                           *
  *                                                                            *
- * Copyright (c) 2005-2012 Stanford University and the Authors                *
+ * Copyright (c) 2005-2017 Stanford University and the Authors                *
  * Author(s): Peter Loan                                                      *
  *                                                                            *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may    *
@@ -24,14 +24,11 @@
 //=============================================================================
 // INCLUDES
 //=============================================================================
-#include "SimTKsimbody.h"
 #include "WrapEllipsoid.h"
-#include <OpenSim/Simulation/Model/PathPoint.h>
 #include "PathWrap.h"
 #include "WrapResult.h"
 #include <OpenSim/Common/SimmMacros.h>
 #include <OpenSim/Common/Mtx.h>
-#include <sstream>
 #include <OpenSim/Common/ModelDisplayHints.h>
 
 //=============================================================================
@@ -1133,12 +1130,14 @@ double WrapEllipsoid::findClosestPoint(double a, double b, double c,
             t = max*sqrt(u*u+v*v+w*w);
         }
 
+        double P{ 0 }, P2{ 0 }, Q{ 0 }, Q2{ 0 }, R{ 0 }, _R2{ 0 };
+        double PQ{ 0 }, PR{ 0 }, QR{ 0 }, PQR{ 0 }, fp{ 0 };
+
         for (i = 0; i < 64; i++)
         {
-            double P = t+a2, P2 = P*P;
-            double Q = t+b2, Q2 = Q*Q;
-            double R = t+c2, _R2 = R*R;
-            double PQ, PR, QR, PQR, fp;
+            P = t+a2, P2 = P*P;
+            Q = t+b2, Q2 = Q*Q;
+            R = t+c2, _R2 = R*R;
 
             f = P2*Q2*_R2 - a2u2*Q2*_R2 - b2v2*P2*_R2 - c2w2*P2*Q2;
         
@@ -1306,14 +1305,17 @@ void WrapEllipsoid::generateDecorations(bool fixed, const ModelDisplayHints& hin
     if (fixed) return;
 
     if (hints.get_show_wrap_geometry()) {
-        const Vec3 color(SimTK::Cyan);
-
+        const Appearance& defaultAppearance = get_Appearance();
+        if (!defaultAppearance.get_visible()) return;
+        const Vec3 color = defaultAppearance.get_color();
+        
         const SimTK::Transform& X_GB = getFrame().getTransformInGround(state);
         SimTK::Transform X_GW = X_GB*getTransform();
         appendToThis.push_back(
             SimTK::DecorativeEllipsoid(getRadii())
             .setTransform(X_GW).setResolution(2.0)
-            .setColor(color).setOpacity(0.5));
+            .setColor(color).setOpacity(defaultAppearance.get_opacity())
+            .setScale(1).setRepresentation(defaultAppearance.get_representation()));
     }
 
 }

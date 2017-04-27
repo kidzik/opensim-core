@@ -7,7 +7,7 @@
  * National Institutes of Health (U54 GM072970, R24 HD065690) and by DARPA    *
  * through the Warrior Web program.                                           *
  *                                                                            *
- * Copyright (c) 2005-2012 Stanford University and the Authors                *
+ * Copyright (c) 2005-2017 Stanford University and the Authors                *
  * Author(s): Ayman Habib                                                     *
  *                                                                            *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may    *
@@ -122,11 +122,12 @@ int main()
     bool after = PropertyHelper::getValueBool(dProp);
     SimTK_ASSERT_ALWAYS(!after, "Property has wrong value!!");
     dTRIlong->updGeometryPath().updateGeometry(context->getCurrentStateRef());
-    const OpenSim::Array<PathPoint*>& path = context->getCurrentPath(*dTRIlong);
+    const OpenSim::Array<AbstractPathPoint*>& path = context->getCurrentPath(*dTRIlong);
     cout << "Muscle Path" << endl;
     cout << path.getSize() << endl;
     for(int i=0; i< path.getSize(); i++)
-        cout << path.get(i)->getBodyName() << path.get(i)->getLocation() << endl;
+        cout << path[i]->getParentFrame().getName()
+             << path[i]->getLocation(stateCopy) << endl;
     // Compare to known path 
     const OpenSim::Body& dBody = model->getBodySet().get("r_ulna_radius_hand");
     Transform xform = context->getTransform(dBody);
@@ -156,12 +157,13 @@ int main()
     cout << xform << endl;
     // Compare to known xform
     dTRIlong->updGeometryPath().updateGeometry(context->getCurrentStateRef());
-    const OpenSim::Array<PathPoint*>& newPath = context->getCurrentPath(*dTRIlong);
+    const OpenSim::Array<AbstractPathPoint*>& newPath = context->getCurrentPath(*dTRIlong);
     // Compare to known path 
     cout << "New Muscle Path" << endl;
     cout << path.getSize() << endl;
     for(int i=0; i< path.getSize(); i++)
-        cout << path.get(i)->getBodyName() << path.get(i)->getLocation() << endl;
+        cout << path[i]->getParentFrame().getName() 
+             << path[i]->getLocation(stateCopy) << endl;
     double length2 = context->getMuscleLength(*dTRIlong);
     cout << length2 << endl;
     ASSERT_EQUAL(.315748, length2, 1e-5);
@@ -176,6 +178,15 @@ int main()
     assert(context->getLocked(dr_elbow_flexNew));
     ASSERT_EQUAL(0.5, context->getValue(dr_elbow_flexNew), 0.000001);
 
+    // Exercise Editing workflow
+    // These are the same calls done from GUI code base through Property edits
+    OpenSim::Body& bdy = model->updBodySet().get("r_humerus");
+    AbstractProperty& massProp = bdy.updPropertyByName("mass");
+    double oldValue = PropertyHelper::getValueDouble(massProp);
+    double v = oldValue + 1.0;
+    context->cacheModelAndState();
+    PropertyHelper::setValueDouble(v, massProp);
+    context->restoreStateFromCachedModel();
     return status;
   } catch (const std::exception& e) {
       cout << "Exception: " << e.what() << endl;

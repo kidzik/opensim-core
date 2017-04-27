@@ -7,7 +7,7 @@
  * National Institutes of Health (U54 GM072970, R24 HD065690) and by DARPA    *
  * through the Warrior Web program.                                           *
  *                                                                            *
- * Copyright (c) 2005-2012 Stanford University and the Authors                *
+ * Copyright (c) 2005-2017 Stanford University and the Authors                *
  *                                                                            *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may    *
  * not use this file except in compliance with the License. You may obtain a  *
@@ -53,18 +53,20 @@ OpenSimContext::OpenSimContext( SimTK::State* s, Model* model ) :
 
 // Transforms
 void OpenSimContext::transformPosition(const PhysicalFrame& body, double* offset, double* gOffset) {
-  _model->getMultibodySystem().realize(*_configState, SimTK::Stage::Position);
-    _model->getSimbodyEngine().transformPosition(*_configState, body, offset, gOffset );
+    _model->getMultibodySystem().realize(*_configState, SimTK::Stage::Position);
+    SimTK::Vec3::updAs(gOffset) = 
+        body.findStationLocationInGround(*_configState, SimTK::Vec3(offset));
 }
 
 SimTK::Transform OpenSimContext::getTransform(const PhysicalFrame& body) { // Body Should be made const
-   _model->getMultibodySystem().realize(*_configState, SimTK::Stage::Position);
-     return _model->getSimbodyEngine().getTransform(*_configState, body );
+     _model->getMultibodySystem().realize(*_configState, SimTK::Stage::Position);
+     return body.getTransformInGround(*_configState);
 }
 
 void OpenSimContext::transform(const PhysicalFrame& ground, double* d, PhysicalFrame& body, double* dragVectorBody) {
-  _model->getMultibodySystem().realize(*_configState, SimTK::Stage::Position);
-    _model->getSimbodyEngine().transform(*_configState, ground, SimTK::Vec3(d), body, SimTK::Vec3::updAs(dragVectorBody) );
+    _model->getMultibodySystem().realize(*_configState, SimTK::Stage::Position);
+    SimTK::Vec3::updAs(dragVectorBody) = 
+        ground.expressVectorInAnotherFrame(*_configState, SimTK::Vec3(d), body);
     return;
 }
 
@@ -118,14 +120,8 @@ double OpenSimContext::getMuscleLength(Muscle& m) {
   return m.getLength(*_configState);
 }
 
-const Array<PathPoint*>& OpenSimContext::getCurrentPath(Muscle& m) {
+const Array<AbstractPathPoint*>& OpenSimContext::getCurrentPath(Muscle& m) {
   return m.getGeometryPath().getCurrentPath(*_configState);
-}
-
-const Array<PathPoint*>& OpenSimContext::getCurrentDisplayPath(GeometryPath& g) {
-  g.updateGeometry(*_configState);
-  _model->getMultibodySystem().realize(*_configState, SimTK::Stage::Velocity);
-  return g.getCurrentDisplayPath(*_configState);
 }
 
 void OpenSimContext::copyMuscle(Muscle& from, Muscle& to) {
@@ -178,10 +174,21 @@ void OpenSimContext::setZCoordinate(MovingPathPoint& mmp, Coordinate&  newCoord)
     return;
 }
 
-void OpenSimContext::setBody(PathPoint& pathPoint, PhysicalFrame&  newBody) {
-   pathPoint.changeBodyPreserveLocation(*_configState, newBody);
-   this->recreateSystemAfterSystemExists();
-   realizeVelocity();
+void OpenSimContext::setBody(AbstractPathPoint& pathPoint, PhysicalFrame&  newBody)
+{
+    PathPoint* spp = dynamic_cast<PathPoint*>(&pathPoint);
+    if (spp) {
+        spp->changeBodyPreserveLocation(*_configState, newBody);
+        this->recreateSystemAfterSystemExists();
+        realizeVelocity();
+        return;
+    }
+    MovingPathPoint* mpp = dynamic_cast<MovingPathPoint*>(&pathPoint);
+    if (mpp) {
+        mpp->setParentFrame(newBody);
+        this->recreateSystemAfterSystemExists();
+        realizeVelocity();
+    }
 }
 
 
@@ -224,7 +231,7 @@ void OpenSimContext::setRangeMax(ConditionalPathPoint&  via, double d) {
     return;
 }
 
-bool OpenSimContext::replacePathPoint(GeometryPath& p, PathPoint& mp, PathPoint& newPoint) {
+bool OpenSimContext::replacePathPoint(GeometryPath& p, AbstractPathPoint& mp, AbstractPathPoint& newPoint) {
    bool ret= p.replacePathPoint(*_configState, &mp, &newPoint );
    recreateSystemAfterSystemExists();
    realizeVelocity();
@@ -233,10 +240,11 @@ bool OpenSimContext::replacePathPoint(GeometryPath& p, PathPoint& mp, PathPoint&
 }
 
 void OpenSimContext::setLocation(PathPoint& mp, int i, double d) {
-    mp.setLocation(*_configState, i, d);
-  _configState->invalidateAll(SimTK::Stage::Position);
-  _model->getMultibodySystem().realize(*_configState, SimTK::Stage::Position);
-    return;
+    SimTK::Vec3 loc = mp.getLocation(*_configState);
+    loc[i] = d;
+    mp.setLocation(loc);
+    _configState->invalidateAll(SimTK::Stage::Position);
+    _model->getMultibodySystem().realize(*_configState, SimTK::Stage::Position);
 }
 
 void OpenSimContext::setEndPoint(PathWrap& mw, int newEndPt) {
@@ -261,7 +269,7 @@ bool OpenSimContext::deletePathPoint(GeometryPath& p, int menuChoice) {
   return ret;
 }
 
-bool OpenSimContext::isActivePathPoint(PathPoint& mp) {
+bool OpenSimContext::isActivePathPoint(AbstractPathPoint& mp) {
   return mp.isActive(*_configState);
 };
 

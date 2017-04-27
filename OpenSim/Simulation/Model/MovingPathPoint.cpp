@@ -7,7 +7,7 @@
  * National Institutes of Health (U54 GM072970, R24 HD065690) and by DARPA    *
  * through the Warrior Web program.                                           *
  *                                                                            *
- * Copyright (c) 2005-2012 Stanford University and the Authors                *
+ * Copyright (c) 2005-2017 Stanford University and the Authors                *
  * Author(s): Peter Loan                                                      *
  *                                                                            *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may    *
@@ -24,11 +24,11 @@
 //=============================================================================
 // INCLUDES
 //=============================================================================
-#include <OpenSim/Common/XMLDocument.h>
 #include "MovingPathPoint.h"
 #include <OpenSim/Common/Function.h>
 #include <OpenSim/Common/Constant.h>
 #include <OpenSim/Common/MultiplierFunction.h>
+#include <OpenSim/Simulation/Model/PhysicalFrame.h>
 #include <OpenSim/Simulation/SimbodyEngine/Coordinate.h>
 
 
@@ -46,7 +46,7 @@ using SimTK::Vec3;
 /*
  * Default constructor.
  */
-MovingPathPoint::MovingPathPoint() : PathPoint()
+MovingPathPoint::MovingPathPoint() : Super()
 {
     constructProperties();
 }
@@ -72,15 +72,15 @@ void MovingPathPoint::constructProperties()
 
 bool MovingPathPoint::hasXCoordinate() const
 {
-    return getConnector<Coordinate>("x_coordinate").isConnected();
+    return getSocket<Coordinate>("x_coordinate").isConnected();
 }
 bool MovingPathPoint::hasYCoordinate() const
 {
-    return getConnector<Coordinate>("y_coordinate").isConnected();
+    return getSocket<Coordinate>("y_coordinate").isConnected();
 }
 bool MovingPathPoint::hasZCoordinate() const
 {
-    return getConnector<Coordinate>("z_coordinate").isConnected();
+    return getSocket<Coordinate>("z_coordinate").isConnected();
 }
 
 const Coordinate& MovingPathPoint::getXCoordinate() const
@@ -100,29 +100,29 @@ const Coordinate& MovingPathPoint::getZCoordinate() const
 
 void MovingPathPoint::setXCoordinate(const Coordinate& coordinate)
 {
-    updConnector<Coordinate>("x_coordinate").connect(coordinate);
+    connectSocket_x_coordinate(coordinate);
 }
 void MovingPathPoint::setYCoordinate(const Coordinate& coordinate)
 {
-    updConnector<Coordinate>("y_coordinate").connect(coordinate);
+    connectSocket_y_coordinate(coordinate);
 }
 void MovingPathPoint::setZCoordinate(const Coordinate& coordinate)
 {
-    updConnector<Coordinate>("z_coordinate").connect(coordinate);
+    connectSocket_z_coordinate(coordinate);
 }
 
 void MovingPathPoint::extendConnectToModel(Model& model)
 {
     Super::extendConnectToModel(model);
     // Hang on to references to the Coordinates instead of
-    // finding the connector each time we need a Coordinate value
-    if (getConnector<Coordinate>("x_coordinate").isConnected()) {
+    // finding the socket each time we need a Coordinate value
+    if (getSocket<Coordinate>("x_coordinate").isConnected()) {
         _xCoordinate.reset(&getConnectee<Coordinate>("x_coordinate"));
     }
-    if (getConnector<Coordinate>("y_coordinate").isConnected()) {
+    if (getSocket<Coordinate>("y_coordinate").isConnected()) {
         _yCoordinate.reset(&getConnectee<Coordinate>("y_coordinate"));
     }
-    if (getConnector<Coordinate>("z_coordinate").isConnected()) {
+    if (getSocket<Coordinate>("z_coordinate").isConnected()) {
         _zCoordinate.reset(&getConnectee<Coordinate>("z_coordinate"));
     }
 
@@ -138,14 +138,6 @@ void MovingPathPoint::extendConnectToModel(Model& model)
         "MovingPathPoint:: Components of the path point location "
         "must depend on the same Coordinate. Condition: "
         "x_coordinate == y_coordinate == z_coordinate  FAILED.");
-
-    // Overwrite any setting of a MovingPathPoint's location property.
-    // MovingPathPoint should NOT derive from Station.
-    // TODO: We should not have Path specific Points of any kind. They should
-    // be "path" Points by virtue of being subcomponents of a GeometryPath.
-    // Set it to NaN so it blows up if we attempt to use a MovingPathPoint
-    // as a Station.
-    set_location(SimTK::Vec3(SimTK::NaN));
 }
 
 //_____________________________________________________________________________
@@ -333,8 +325,6 @@ void MovingPathPoint::scale(const SimTK::Vec3& aScaleFactors)
             set_z_location(MultiplierFunction(get_z_location().clone(), aScaleFactors[2]));
         }
     }
-
-    updateGeometry();
 }
 
 

@@ -7,7 +7,7 @@
  * National Institutes of Health (U54 GM072970, R24 HD065690) and by DARPA    *
  * through the Warrior Web program.                                           *
  *                                                                            *
- * Copyright (c) 2005-2012 Stanford University and the Authors                *
+ * Copyright (c) 2005-2017 Stanford University and the Authors                *
  * Author(s): Peter Loan                                                      *
  *                                                                            *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may    *
@@ -26,8 +26,6 @@
 //=============================================================================
 #include "Marker.h"
 #include "Model.h"
-#include <OpenSim/Simulation/Model/Model.h>
-#include "BodySet.h"
 
 //=============================================================================
 // STATICS
@@ -46,7 +44,7 @@ using SimTK::Vec3;
 Marker::Marker() :
 Station()
 {
-
+    constructProperties();
 }
 
 //_____________________________________________________________________________
@@ -67,24 +65,25 @@ void Marker::setNull()
 }
 //_____________________________________________________________________________
 /**
+* Construct properties and initialize their default values.
+*/
+void Marker::constructProperties()
+{
+    // Indicate whether the Marker is fixed or not (for MarkerPlacement)
+    constructProperty_fixed(false);
+}
+
+//_____________________________________________________________________________
+/**
  * Set the 'frame name' field, which is used when the marker is added to
  * an existing model.
  *
- * @param aName name of frame
+ * @param  name of frame
  */
-void Marker::setFrameName(const string& aName)
+void Marker::setFrameName(const string& name)
 {
-    const PhysicalFrame* refFrame = dynamic_cast<const PhysicalFrame*>(&getModel().getFrameSet().get(aName));
-    if (refFrame)
-    {
-        setParentFrame(*refFrame);
-    }
-    else
-    {
-        string errorMessage = "Markers must be fixed to PhysicalFrames. " + string(aName) + " is not a PhysicalFrame.";
-        throw Exception(errorMessage);
-    }
-
+    const auto& refFrame = getModel().getComponent<PhysicalFrame>(name);
+    setParentFrame(refFrame);
 }
 
 //_____________________________________________________________________________
@@ -187,7 +186,7 @@ void Marker::updateFromXMLNode(SimTK::Xml::Element& aNode, int versionNumber)
         }
     }
     // Call base class now assuming _node has been corrected for current version
-    Object::updateFromXMLNode(aNode, versionNumber);
+    Super::updateFromXMLNode(aNode, versionNumber);
 }
 
 void Marker::generateDecorations(bool fixed, const ModelDisplayHints& hints, const SimTK::State& state,
@@ -195,16 +194,17 @@ void Marker::generateDecorations(bool fixed, const ModelDisplayHints& hints, con
 {
     Super::generateDecorations(fixed, hints, state, appendToThis);
     if (!fixed) return;
-    if (hints.get_show_markers()) { 
-        // @TODO default color, size, shape should be obtained from hints
-        const Vec3 pink(1, .6, .8);
-        const OpenSim::PhysicalFrame& frame = getParentFrame();
-        //const Frame& bf = frame.findBaseFrame();
-        //SimTK::Transform bTrans = frame.findTransformInBaseFrame();
-        //const Vec3& p_BM = bTrans*get_location();
-        appendToThis.push_back(
-            SimTK::DecorativeSphere(.005).setBodyId(frame.getMobilizedBodyIndex())
-            .setColor(pink).setOpacity(1.0)
-            .setTransform(get_location()));
-    }
+    if (!hints.get_show_markers()) return;
+    
+    // @TODO default color, size, shape should be obtained from hints
+    const Vec3 color = hints.get_marker_color();
+    const OpenSim::PhysicalFrame& frame = getParentFrame();
+    //const Frame& bf = frame.findBaseFrame();
+    //SimTK::Transform bTrans = frame.findTransformInBaseFrame();
+    //const Vec3& p_BM = bTrans*get_location();
+    appendToThis.push_back(
+        SimTK::DecorativeSphere(.005).setBodyId(frame.getMobilizedBodyIndex())
+        .setColor(color).setOpacity(1.0)
+        .setTransform(get_location()));
+    
 }

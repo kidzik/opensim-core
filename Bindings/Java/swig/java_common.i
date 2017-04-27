@@ -1,7 +1,9 @@
-%module(directors="1") opensimModelCommon
-%module opensimModelCommon
+%module(directors="1") opensimCommon
+%module opensimCommon
 
 #pragma SWIG nowarn=822,451,503,516,325,401
+
+%include java_exception.i
 
 %{
 #include <Bindings/OpenSimHeaders_common.h>
@@ -120,35 +122,6 @@ using namespace SimTK;
   }
 %}
 
-// Generic Exception handling
-%typemap(throws) SWIGTYPE, SWIGTYPE &, SWIGTYPE *, SWIGTYPE [ANY] %{
-    SWIG_JavaThrowException(jenv, SWIG_JavaIOException,
-                            "C++ $1_type exception thrown");
-    return $null;
-%}
-
-%typemap(throws, throws="java.io.IOException") OpenSim::Exception {
-    jclass excep = jenv->FindClass("java/io/IOException");
-    if (excep)
-        jenv->ThrowNew(excep, ($1).getMessage());
-    return $null;
-}
-
-%exception {
-  if (OpenSim::mapCxxExceptionsToJava){
-	  try {
-	  $action
-	  }
-	  catch(std::exception& _ex){
-              jclass excep = jenv->FindClass("java/lang/RuntimeException");
-              if (excep)
-                  jenv->ThrowNew(excep,_ex.what());
-	  }
-  }
-  else
-	$action
-}
-
 %extend OpenSim::Array<double> {
     void setValues(double dValues[], int size) {
         self->setSize(size);
@@ -242,7 +215,6 @@ SWIG_JAVABODY_PROXY(public, public, SWIGTYPE)
       private_addComponent(comp);
   }
 %}
-
 
 %import "java_simbody.i"
 

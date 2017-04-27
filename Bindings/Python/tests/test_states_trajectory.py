@@ -6,6 +6,9 @@ import opensim as osim
 test_dir = os.path.join(os.path.dirname(os.path.abspath(osim.__file__)),
                         'tests')
 
+# Silence warning messages if mesh (.vtp) files cannot be found.
+osim.Model.setDebugLevel(0)
+
 # TODO add more tests of the integrity checks.
 
 class TestStatesTrajectory(unittest.TestCase):
@@ -75,6 +78,7 @@ class TestStatesTrajectory(unittest.TestCase):
         # wrapping works.
         model = osim.Model(os.path.join(test_dir,
             "gait10dof18musc_subject01.osim"))
+        model.initSystem()
         sto = osim.Storage(self.states_sto_fname)
         states = osim.StatesTrajectory.createFromStatesStorage(
                 model, sto)

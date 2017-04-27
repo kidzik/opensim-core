@@ -1,5 +1,5 @@
 /* -------------------------------------------------------------------------- *
- *                           OpenSim:  PathSpring.cpp                           *
+ *                           OpenSim:  PathSpring.cpp                         *
  * -------------------------------------------------------------------------- *
  * The OpenSim API is a toolkit for musculoskeletal modeling and simulation.  *
  * See http://opensim.stanford.edu and the NOTICE file for more information.  *
@@ -7,8 +7,8 @@
  * National Institutes of Health (U54 GM072970, R24 HD065690) and by DARPA    *
  * through the Warrior Web program.                                           *
  *                                                                            *
- * Copyright (c) 2005-2013 Stanford University and the Authors                *
- * Author(s): Ajay Seth                                                     *
+ * Copyright (c) 2005-2017 Stanford University and the Authors                *
+ * Author(s): Ajay Seth                                                       *
  *                                                                            *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may    *
  * not use this file except in compliance with the License. You may obtain a  *
@@ -109,9 +109,15 @@ void PathSpring::extendFinalizeFromProperties()
     GeometryPath& path = upd_GeometryPath();
     path.setDefaultColor(DefaultPathSpringColor);
 
-    // Resting length must be greater than 0.0.
-    assert(get_resting_length() > 0.0);
-    path.setOwner(this);
+    OPENSIM_THROW_IF_FRMOBJ(
+        (SimTK::isNaN(get_resting_length()) || get_resting_length() < 0),
+        InvalidPropertyValue, getProperty_resting_length().getName());
+    OPENSIM_THROW_IF_FRMOBJ(
+        (SimTK::isNaN(get_stiffness()) || get_stiffness() < 0),
+        InvalidPropertyValue, getProperty_stiffness().getName());
+    OPENSIM_THROW_IF_FRMOBJ(
+        (SimTK::isNaN(get_dissipation()) || get_dissipation() < 0),
+        InvalidPropertyValue, getProperty_dissipation().getName());
 }
 
 

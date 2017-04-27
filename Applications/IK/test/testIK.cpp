@@ -7,7 +7,7 @@
  * National Institutes of Health (U54 GM072970, R24 HD065690) and by DARPA    *
  * through the Warrior Web program.                                           *
  *                                                                            *
- * Copyright (c) 2005-2012 Stanford University and the Authors                *
+ * Copyright (c) 2005-2017 Stanford University and the Authors                *
  * Author(s): Ayman Habib, Ajay Seth, Cassidy Kelly, Peter Loan               *
  *                                                                            *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may    *
@@ -31,6 +31,7 @@
 #include <OpenSim/Simulation/OrientationsReference.h>
 #include <OpenSim/Simulation/InverseKinematicsSolver.h>
 #include <OpenSim/Tools/InverseKinematicsTool.h>
+#include <OpenSim/Tools/IKTaskSet.h>
 #include <OpenSim/Auxiliary/auxiliaryTestFunctions.h>
 
 using namespace OpenSim;
@@ -60,34 +61,6 @@ int main()
         failures.push_back("testInverseKinematicsSolverWithEulerAnglesFromFile");
     }
 
-    Storage  standard("std_subject01_walk1_ik.mot");
-    try {
-        InverseKinematicsTool ik1("subject01_Setup_InverseKinematics.xml");
-        ik1.run();
-        Storage result1(ik1.getOutputMotionFileName());
-        CHECK_STORAGE_AGAINST_STANDARD(result1, standard, Array<double>(0.2, 24), __FILE__, __LINE__, "testInverseKinematicsGait2354 failed");
-        cout << "testInverseKinematicsGait2354 passed" << endl;
-    }
-    catch (const std::exception& e) {
-        cout << e.what() << endl;
-        failures.push_back("testInverseKinematicsGait2354");
-    }
-
-    try {
-        InverseKinematicsTool ik2("subject01_Setup_InverseKinematics_NoModel.xml");
-        Model mdl("subject01_simbody.osim");
-        mdl.initSystem();
-        ik2.setModel(mdl);
-        ik2.run();
-        Storage result2(ik2.getOutputMotionFileName());
-        CHECK_STORAGE_AGAINST_STANDARD(result2, standard, Array<double>(0.2, 24), __FILE__, __LINE__, "testInverseKinematicsGait2354 GUI workflow failed");
-        cout << "testInverseKinematicsGait2354 GUI workflow passed" << endl;
-    }
-    catch (const std::exception& e) {
-        cout << e.what() << endl;
-        failures.push_back("testInverseKinematicsGait2354_GUI_workflow");
-    }
-
     try {
         InverseKinematicsTool ik3("constraintTest_setup_ik.xml");
         ik3.run();
@@ -109,11 +82,13 @@ int main()
     return 0;
 }
 
+typedef STOFileAdapter_<double> STOFileAdapter;
+
 void testInverseKinematicsSolverWithOrientations()
 {
     Model model("subject01_simbody.osim");
     // visualize for debugging
-    //model.setUseVisualizer(true);
+    // model.setUseVisualizer(true);
     
     SimTK::State& s0 = model.initSystem();
 
@@ -212,7 +187,8 @@ void testInverseKinematicsSolverWithOrientations()
     SimTK::Array_<CoordinateReference> coordinateReferences;
 
     // create the solver given the input data
-    InverseKinematicsSolver ikSolver(model, nullptr, &oRefs, 
+    MarkersReference markersReference;
+    InverseKinematicsSolver ikSolver(model, markersReference, &oRefs, 
         coordinateReferences);
     ikSolver.setAccuracy(1e-4);
 
@@ -233,7 +209,7 @@ void testInverseKinematicsSolverWithEulerAnglesFromFile()
 {
     Model model("subject01_simbody.osim");
     // visualize for debugging
-    //model.setUseVisualizer(true);
+    model.setUseVisualizer(true);
 
     // Add a reporter to get IK computed coordinate values out
     TableReporter* ikReporter = new TableReporter();
@@ -254,7 +230,8 @@ void testInverseKinematicsSolverWithEulerAnglesFromFile()
 
     // create the solver given the input data
     const double accuracy = 1e-4;
-    InverseKinematicsSolver ikSolver(model, nullptr, &oRefs,
+    MarkersReference markersReference;
+    InverseKinematicsSolver ikSolver(model, markersReference, &oRefs,
         coordinateReferences);
     ikSolver.setAccuracy(accuracy);
 
@@ -262,17 +239,17 @@ void testInverseKinematicsSolverWithEulerAnglesFromFile()
 
     s0.updTime() = times[0];
     ikSolver.assemble(s0);
-    //model.getVisualizer().show(s0);
+    model.getVisualizer().show(s0);
 
     for (auto time : times) {
         s0.updTime() = time;
         ikSolver.track(s0);
-        //model.getVisualizer().show(s0);
+        model.getVisualizer().show(s0);
         // realize to report to get reporter to pull values from model
         model.realizeReport(s0);
     }
 
-    auto report = ikReporter->getReport();
+    auto report = ikReporter->getTable();
     STOFileAdapter::write(report, "ik_euler_tracking_results.sto");
 
     const auto standard = STOFileAdapter::read("std_subject01_walk1_ik.mot");

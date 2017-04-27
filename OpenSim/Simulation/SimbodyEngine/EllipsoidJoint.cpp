@@ -7,7 +7,7 @@
  * National Institutes of Health (U54 GM072970, R24 HD065690) and by DARPA    *
  * through the Warrior Web program.                                           *
  *                                                                            *
- * Copyright (c) 2005-2012 Stanford University and the Authors                *
+ * Copyright (c) 2005-2017 Stanford University and the Authors                *
  * Author(s): Ajay Seth                                                       *
  *                                                                            *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may    *
@@ -21,57 +21,48 @@
  * limitations under the License.                                             *
  * -------------------------------------------------------------------------- */
 
-//=============================================================================
+//==============================================================================
 // INCLUDES
-//=============================================================================
+//==============================================================================
 #include "EllipsoidJoint.h"
 #include <OpenSim/Simulation/Model/Model.h>
+#include "simbody/internal/MobilizedBody_Ellipsoid.h"
 
-//=============================================================================
+//==============================================================================
 // STATICS
-//=============================================================================
+//==============================================================================
 using namespace std;
 using namespace SimTK;
 using namespace OpenSim;
 
-//=============================================================================
-// CONSTRUCTOR(S) AND DESTRUCTOR
-//=============================================================================
-//_____________________________________________________________________________
-/**
- * Default constructor.
- */
+//==============================================================================
+// CONSTRUCTORS AND DESTRUCTOR
+//==============================================================================
 EllipsoidJoint::EllipsoidJoint() : Super()
 {
     constructProperties();
 }
-//_____________________________________________________________________________
-/**
- * Convenience Constructor.
- */
-EllipsoidJoint::EllipsoidJoint( const std::string& name,
-                                const PhysicalFrame& parent,
-                                const PhysicalFrame& child,
-                                const SimTK::Vec3& ellipsoidRadii,
-                                bool reverse) :
-                                  Super(name, parent, child, reverse)
+
+EllipsoidJoint::EllipsoidJoint(const std::string&    name,
+                               const PhysicalFrame&  parent,
+                               const PhysicalFrame&  child,
+                               const SimTK::Vec3&    ellipsoidRadii) :
+                               Super(name, parent, child)
 {
     constructProperties();
     set_radii_x_y_z(ellipsoidRadii);
 }
 
-/* Deprecated Constructor*/
-EllipsoidJoint::EllipsoidJoint(const std::string& name,
-    const PhysicalFrame& parent,
-    const SimTK::Vec3& locationInParent,
-    const SimTK::Vec3& orientationInParent,
-    const PhysicalFrame& child,
-    const SimTK::Vec3& locationInChild,
-    const SimTK::Vec3& orientationInChild,
-    const SimTK::Vec3& ellipsoidRadii,
-    bool reverse) :
+EllipsoidJoint::EllipsoidJoint(const std::string&    name,
+                               const PhysicalFrame&  parent,
+                               const SimTK::Vec3&    locationInParent,
+                               const SimTK::Vec3&    orientationInParent,
+                               const PhysicalFrame&  child,
+                               const SimTK::Vec3&    locationInChild,
+                               const SimTK::Vec3&    orientationInChild,
+                               const SimTK::Vec3&    ellipsoidRadii) :
     Super(name, parent, locationInParent, orientationInParent,
-        child, locationInChild, orientationInChild, reverse)
+          child, locationInChild, orientationInChild)
 {
     constructProperties();
     set_radii_x_y_z(ellipsoidRadii);
@@ -164,11 +155,9 @@ void EllipsoidJoint::extendInitStateFromProperties(SimTK::State& s) const
     const SimbodyMatterSubsystem& matter = getModel().getMatterSubsystem();
     
     if (!matter.getUseEulerAngles(s)){
-        const CoordinateSet& coordinateSet = get_CoordinateSet();
-
-        double xangle = coordinateSet[0].getDefaultValue();
-        double yangle = coordinateSet[1].getDefaultValue();
-        double zangle = coordinateSet[2].getDefaultValue();
+        double xangle = getCoordinate(EllipsoidJoint::Coord::Rotation1X).getDefaultValue();
+        double yangle = getCoordinate(EllipsoidJoint::Coord::Rotation2Y).getDefaultValue();
+        double zangle = getCoordinate(EllipsoidJoint::Coord::Rotation3Z).getDefaultValue();
         Rotation r(BodyRotationSequence, xangle, XAxis, 
                                          yangle, YAxis, zangle, ZAxis);
 
@@ -188,11 +177,9 @@ void EllipsoidJoint::extendSetPropertiesFromState(const SimTK::State& state)
         Rotation r = getChildFrame().getMobilizedBody().getBodyRotation(state);
         Vec3 angles = r.convertRotationToBodyFixedXYZ();
 
-        const CoordinateSet& coordinateSet = get_CoordinateSet();
-
-        coordinateSet[0].setDefaultValue(angles[0]);
-        coordinateSet[1].setDefaultValue(angles[1]);
-        coordinateSet[2].setDefaultValue(angles[2]);
+        updCoordinate(EllipsoidJoint::Coord::Rotation1X).setDefaultValue(angles[0]);
+        updCoordinate(EllipsoidJoint::Coord::Rotation2Y).setDefaultValue(angles[1]);
+        updCoordinate(EllipsoidJoint::Coord::Rotation3Z).setDefaultValue(angles[2]);
     }
 }
 

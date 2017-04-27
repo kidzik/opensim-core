@@ -1,7 +1,7 @@
 #ifndef OPENSIM_PATH_SPRING_H_
 #define OPENSIM_PATH_SPRING_H_
 /* -------------------------------------------------------------------------- *
- *                            OpenSim:  PathSpring.h                            *
+ *                            OpenSim:  PathSpring.h                          *
  * -------------------------------------------------------------------------- *
  * The OpenSim API is a toolkit for musculoskeletal modeling and simulation.  *
  * See http://opensim.stanford.edu and the NOTICE file for more information.  *
@@ -9,8 +9,8 @@
  * National Institutes of Health (U54 GM072970, R24 HD065690) and by DARPA    *
  * through the Warrior Web program.                                           *
  *                                                                            *
- * Copyright (c) 2005-2013 Stanford University and the Authors                *
- * Author(s): Ajay Seth                                                      *
+ * Copyright (c) 2005-2017 Stanford University and the Authors                *
+ * Author(s): Ajay Seth                                                       *
  *                                                                            *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may    *
  * not use this file except in compliance with the License. You may obtain a  *
@@ -27,13 +27,12 @@
 //=============================================================================
 // INCLUDES
 //=============================================================================
-#include <OpenSim/Common/ScaleSet.h>
-#include "Model.h"
 #include "Force.h"
 
 namespace OpenSim {
 
 class GeometryPath;
+class ScaleSet;
 
 //=============================================================================
 //=============================================================================
@@ -83,7 +82,9 @@ public:
 // PUBLIC METHODS
 //==============================================================================
     
-    /** Default constructor */
+    /** Construct a PathSpring with default parameters. Users should note
+    that the default values for resting_length, stiffness, and dissipation
+    are `NaN` so they must be set before simulating. */
     PathSpring();
 
     /** Convenience constructor with PathSpring parameters
