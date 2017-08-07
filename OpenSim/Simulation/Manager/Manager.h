@@ -202,6 +202,7 @@ public:
     // CONSTANT TIME STEP
     void setUseConstantDT(bool aTrueFalse);
     bool getUseConstantDT() const;
+    void setAccuracy(double accurarcy);
     // DT VECTOR
     const Array<double>& getDTArray();
     void setDTArray(const SimTK::Vector_<double>& aDT, double aTI = 0.0);

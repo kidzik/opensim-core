@@ -757,6 +757,19 @@ integrate(SimTK::State& s)
 
 //_____________________________________________________________________________
 /**
+ * Set accuracy of the integrator
+ *
+ * @param accuracy new accuracy
+ */
+void Manager::
+setAccuracy(double accuracy)
+{
+  _integ->setAccuracy(accuracy);
+}
+
+
+//_____________________________________________________________________________
+/**
  * return the step size when the integrator is taking fixed
  * step sizes
  * 
