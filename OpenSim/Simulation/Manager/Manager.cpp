@@ -183,6 +183,30 @@ toString() const
     return(_displayName);
 }
 //-----------------------------------------------------------------------------
+// INTEGRATOR ACCURACY
+//-----------------------------------------------------------------------------
+//_____________________________________________________________________________
+/**
+ * Set the overall accuracy that should be used for integration. 
+ *
+ * @param accuracy Integrator accuracy > 0 to set
+ */
+void Manager::
+setIntegratorAccuracy(double accuracy)
+{
+  _integ->setAccuracy(accuracy);
+}
+//_____________________________________________________________________________
+/**
+ * Get the accuracy which is being used for error control.
+ * Usually this is the same value that was specified to @see setAccuracy().
+ */
+double Manager::
+getIntegratorAccuracy() const
+{
+  return _integ->getAccuracyInUse();
+}
+//-----------------------------------------------------------------------------
 // SPECIFIED DT
 //-----------------------------------------------------------------------------
 //_____________________________________________________________________________

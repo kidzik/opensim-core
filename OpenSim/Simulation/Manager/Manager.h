@@ -179,6 +179,9 @@ public:
      */
     void setIntegrator(SimTK::Integrator&);
 
+    // INTEGRATOR ACCURACY
+    void setIntegratorAccuracy(double accuracy);
+    double getIntegratorAccuracy() const;
     // SPECIFIED TIME STEP
     void setUseSpecifiedDT(bool aTrueFalse);
     bool getUseSpecifiedDT() const;
